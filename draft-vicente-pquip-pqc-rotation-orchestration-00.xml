@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE rfc [
+  <!ENTITY nbsp "&#160;">
+]>
+<rfc xmlns:xi="http://www.w3.org/2001/XInclude"
+     category="info"
+     docName="draft-vicente-pquip-pqc-rotation-orchestration-00"
+     ipr="trust200902"
+     submissionType="independent"
+     xml:lang="en"
+     version="3">
+
+  <front>
+    <title abbrev="PQC Rotation Orchestration">Cross-Protocol Post-Quantum Cryptographic Rotation Orchestration</title>
+
+    <seriesInfo name="Internet-Draft" value="draft-vicente-pquip-pqc-rotation-orchestration-00"/>
+
+    <author initials="B." surname="Vicente" fullname="Brian Vicente">
+      <organization>Sanctum SecOps LLC</organization>
+      <address>
+        <postal>
+          <city>Pine City</city>
+          <region>NY</region>
+          <country>United States of America</country>
+        </postal>
+        <email>bvicente@sanctumsecops.com</email>
+        <uri>https://orcid.org/0009-0006-6395-5308</uri>
+      </address>
+    </author>
+
+    <date year="2026" month="June" day="8"/>
+
+    <area>Security</area>
+    <workgroup>Post-Quantum Use In Protocols</workgroup>
+
+    <keyword>post-quantum cryptography</keyword>
+    <keyword>PQC</keyword>
+    <keyword>Sanctum SecOps</keyword>
+    <keyword>pquip</keyword>
+
+    <abstract>
+      <t>This document defines a vendor-neutral data model and a state machine for orchestrating coordinated post-quantum cryptographic (PQC) algorithm and key rotation across multiple IETF protocol surfaces within a single administrative domain. Protocol surfaces in scope include TLS 1.3, IKEv2, COSE, JOSE, and X.509 PKI. The model introduces the notion of a rotation epoch, a cross-protocol dependency graph, and a rollback gate.</t>
+      <t>The mechanism is intended to be implementable by orchestration controllers and is intentionally interface-only. Concrete trigger weights, carve-out parameters, and tenant policy values remain operator-specific and are not disclosed in this Internet-Draft.</t>
+    </abstract>
+
+    <note title="Source and Archival" removeInRFC="true">
+      <t>
+        Source for this draft is maintained at
+        <eref target="https://github.com/Sanc-Admin/pquip-pqc-rotation-orchestration">https://github.com/Sanc-Admin/pquip-pqc-rotation-orchestration</eref>.
+        A citable archival version of this document is published at Zenodo
+        upon each tagged release.
+        Author ORCID iD:
+        <eref target="https://orcid.org/0009-0006-6395-5308">https://orcid.org/0009-0006-6395-5308</eref>.
+        Author professional credentials:
+        <eref target="https://www.credly.com/users/brian-vicente">https://www.credly.com/users/brian-vicente</eref>.
+      </t>
+      <t>
+        Discussion of this document occurs on the IETF "pqc" mailing list
+        (pqc@ietf.org). Issues and pull requests may be filed at the GitHub
+        repository linked above.
+      </t>
+    </note>
+
+    <note title="IPR Considerations" removeInRFC="true">
+      <t>
+        The author has filed United States patent applications covering
+        subject matter relevant to this document, including
+        U.S. Provisional Patent Application No. 64/080,137
+        (filed 2026-06-01) and U.S. Patent Application No. 19/698,870
+        (filed 2026-06-05). By posting this Internet-Draft, the author
+        submits to the IETF Trust the rights described in Section 5 of
+        BCP 78 and BCP 79. Patent licensing terms are not yet known.
+        Implementers and reviewers should consult the IETF Datatracker
+        IPR disclosure page for this document for current disclosure
+        status. The Sanctum SecOps Private Enterprise Number (PEN) root
+        used for any OID allocations referenced in companion documents is
+        1.3.6.1.4.1.65953.
+      </t>
+      <t>
+        Patent-Pending Claim Scope: The scope of the pending patent
+        applications referenced above includes, but is not limited to,
+        the orchestration, observability, and tenant-isolation mechanisms
+        described in this document insofar as they intersect the claims
+        of the referenced applications. This Internet-Draft itself does
+        not grant any patent license. Specific implementation parameters
+        that would extend beyond the disclosed interface (including but
+        not limited to scoring weights, rotation triggers, tenant
+        carve-out parameters, and adequacy thresholds) are intentionally
+        out of scope and are not disclosed in this Internet-Draft.
+      </t>
+    </note>
+
+  </front>
+
+  <middle>
+    <section anchor="introduction">
+      <name>Introduction</name>
+      <t>Enterprise migrations to post-quantum cryptography require coordinated rotation across many protocol surfaces. Today, each surface defines rotation independently, leading to inconsistent posture across an administrative domain. This document defines an orchestration layer above existing surface-specific rotation mechanisms.</t>
+    </section>
+    <section anchor="terminology">
+      <name>Terminology</name>
+      <t>The key words "MUST", "MUST NOT", "SHOULD", "MAY" in this document are to be interpreted as described in BCP 14 [RFC2119] [RFC8174] when, and only when, they appear in all capitals, as shown here.</t>
+    </section>
+    <section anchor="rotation-epoch-data-model">
+      <name>Rotation Epoch Data Model</name>
+      <t>A rotation epoch is identified by an opaque rotation_epoch_id string and bound to a set of (protocol, algorithm, parameter) tuples. The data model is expressed in YANG with a JSON instance encoding for controller-to-controller exchange.</t>
+    </section>
+    <section anchor="cross-protocol-dependency-graph">
+      <name>Cross-Protocol Dependency Graph</name>
+      <t>Surfaces MAY declare dependencies on other surfaces such that a rotation event on a parent surface gates rotation of children. The graph is acyclic. Cycles MUST be rejected by the orchestration controller.</t>
+    </section>
+    <section anchor="rollback-gate">
+      <name>Rollback Gate</name>
+      <t>Each rotation transition includes a rollback gate that specifies the maximum time and error rate beyond which a rotation MUST be reversed. Concrete numeric values for rollback thresholds are deployment-specific and are not disclosed in this Internet-Draft.</t>
+    </section>
+    <section anchor="security-considerations">
+      <name>Security Considerations</name>
+      <t>Orchestration controllers become high-value targets and MUST be hardened accordingly. The interface specified here does not transport private-key material; controllers SHOULD use mutual TLS and short-lived credentials.</t>
+    </section>
+    <section anchor="iana-considerations">
+      <name>IANA Considerations</name>
+      <t>This document requests IANA to establish a Post-Quantum Rotation Orchestration Registry under the Security area, containing surface identifiers, dependency relation codes, and standard rollback-gate parameter names.</t>
+    </section>
+
+  </middle>
+
+  <back>
+    <references>
+      <name>Informative References</name>
+      <reference anchor="RFC2119" target="https://www.rfc-editor.org/info/rfc2119">
+        <front>
+          <title>Key words for use in RFCs to Indicate Requirement Levels</title>
+          <author initials="S." surname="Bradner" fullname="S. Bradner"/>
+          <date year="1997" month="March"/>
+        </front>
+      </reference>
+      <reference anchor="RFC8174" target="https://www.rfc-editor.org/info/rfc8174">
+        <front>
+          <title>Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words</title>
+          <author initials="B." surname="Leiba" fullname="B. Leiba"/>
+          <date year="2017" month="May"/>
+        </front>
+      </reference>
+    </references>
+  </back>
+</rfc>
