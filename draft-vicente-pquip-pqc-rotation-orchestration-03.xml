@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE rfc [
+  <!ENTITY nbsp "&#160;">
+]>
+<rfc xmlns:xi="http://www.w3.org/2001/XInclude"
+     category="info"
+     docName="draft-vicente-pquip-pqc-rotation-orchestration-03"
+     ipr="trust200902"
+     submissionType="independent"
+     xml:lang="en"
+     version="3">
+  <front>
+    <title abbrev="PQC Rotation Orchestration">Cross-Protocol PQC Key Rotation Orchestration</title>
+    <seriesInfo name="Internet-Draft" value="draft-vicente-pquip-pqc-rotation-orchestration-03"/>
+    <author initials="B." surname="Vicente" fullname="Brian Vicente">
+      <organization>Sanctum SecOps LLC</organization>
+      <address>
+        <postal><city>Pine City</city><region>NY</region><country>United States of America</country></postal>
+        <email>brian@sanctumsecops.io</email>
+        <uri>https://orcid.org/0009-0006-6395-5308</uri>
+      </address>
+    </author>
+    <date year="2026" month="August" day="12"/>
+    <area>Security</area>
+    <workgroup>Post-Quantum Cryptography in the IETF</workgroup>
+    <keyword>post-quantum cryptography</keyword>
+    <keyword>PQC</keyword>
+    <keyword>key rotation</keyword>
+    <keyword>orchestration</keyword>
+    <keyword>ML-DSA</keyword>
+    <keyword>Sanctum SecOps</keyword>
+    <abstract>
+      <t>This document defines a cross-protocol orchestration framework for post-quantum cryptographic (PQC) key rotation across heterogeneous networked environments. It specifies the sequencing, signaling, and rollback mechanisms required to coordinate ML-DSA and SLH-DSA key epoch transitions across TLS, PKIX, OAuth, ACME, BRSKI, WIMSE, RATS, and SCITT protocol stacks without service interruption.</t>
+      <t>This revision (-03) expands the orchestration state machine, adds conformance criteria for tenant-isolated PKI environments, and aligns epoch signaling with draft-vicente-lamps-rotation-envelope.</t>
+    </abstract>
+    <note title="Source and Archival" removeInRFC="true">
+      <t>Source: <eref target="https://github.com/Sanc-Admin/pquip-pqc-rotation-orchestration"/>. ORCID: <eref target="https://orcid.org/0009-0006-6395-5308"/>. Discussion: pqc@ietf.org.</t>
+    </note>
+    <note title="IPR Considerations" removeInRFC="true">
+      <t>U.S. Provisional Patent Application No. 64/080,137 (2026-06-01) and U.S. Patent Application No. 19/698,870 (2026-06-05). Sanctum SecOps PEN root: 1.3.6.1.4.1.65953.</t>
+    </note>
+  </front>
+  <middle>
+    <section anchor="introduction" numbered="true"><name>Introduction</name>
+      <t>PQC migration requires coordinated key rotation across multiple protocol layers simultaneously. Ad-hoc per-protocol rotation creates epoch skew: a TLS endpoint may accept connections under epoch N+1 while a dependent OCSP responder still operates under epoch N, causing verification failures. This document defines a cross-protocol orchestration framework that eliminates epoch skew by providing a unified rotation state machine, inter-protocol signaling, and tenant-aware rollback.</t>
+      <t>This revision (-03) aligns the epoch signal format with draft-vicente-lamps-rotation-envelope and adds conformance criteria for multi-tenant PKI deployments (draft-vicente-pquip-multitenant-pki-requirements).</t>
+    </section>
+    <section anchor="terminology" numbered="true"><name>Terminology</name>
+      <t>BCP 14 <xref target="RFC2119"/> <xref target="RFC8174"/> applies.</t>
+      <dl newline="true" spacing="normal">
+        <dt>Epoch:</dt><dd>A discrete interval of PQC signing-key validity, identified by a monotonically increasing integer (epoch_id).</dd>
+        <dt>Rotation Orchestrator:</dt><dd>The system component responsible for sequencing epoch transitions across protocol stacks.</dd>
+        <dt>Epoch Skew:</dt><dd>The condition in which different protocol endpoints operate under different epoch_id values simultaneously, causing verification failures.</dd>
+        <dt>Rotation Envelope:</dt><dd>The artifact defined in draft-vicente-lamps-rotation-envelope conveying prior and new epoch certificate bindings.</dd>
+      </dl>
+    </section>
+    <section anchor="orchestration-state-machine" numbered="true"><name>Orchestration State Machine</name>
+      <t>The rotation orchestrator MUST implement the following states:</t>
+      <ol>
+        <li><strong>IDLE:</strong> No rotation in progress. Current epoch_id is authoritative.</li>
+        <li><strong>PREPARE:</strong> New ML-DSA key pair generated. Rotation Envelope constructed. Pre-position signals sent to dependent protocol stacks.</li>
+        <li><strong>COMMIT:</strong> All dependent stacks have acknowledged readiness. New epoch_id becomes authoritative. Old epoch remains valid for a configurable grace period.</li>
+        <li><strong>DRAIN:</strong> Grace period active. Both epoch_id N and N+1 accepted. Connections using epoch N are drained.</li>
+        <li><strong>COMPLETE:</strong> Grace period expired. Epoch N revoked. Rotation Envelope published to SCITT transparency log.</li>
+        <li><strong>ROLLBACK:</strong> Entered from PREPARE or COMMIT on error. Epoch N+1 abandoned. Epoch N remains authoritative.</li>
+      </ol>
+      <t>The orchestrator MUST NOT transition from PREPARE to COMMIT until all registered protocol stacks have acknowledged epoch readiness. Unacknowledged stacks MUST trigger ROLLBACK after a configurable timeout (default: 300 seconds).</t>
+    </section>
+    <section anchor="inter-protocol-signaling" numbered="true"><name>Inter-Protocol Epoch Signaling</name>
+      <t>Protocol stacks participating in orchestrated rotation MUST implement an epoch readiness signal. The signal MUST convey:</t>
+      <ul>
+        <li>The stack identifier (e.g., "tls", "ocsp", "acme", "oauth", "brski").</li>
+        <li>The epoch_id being acknowledged.</li>
+        <li>A readiness timestamp (UTC).</li>
+        <li>A readiness status: READY, NOT_READY, or ERROR.</li>
+      </ul>
+      <t>Signals MUST be integrity-protected using the current epoch's ML-DSA signing key. Signal transport is stack-specific and out of scope; recommended transports include HTTPS with mutual ML-DSA authentication and MQTT with ML-DSA-signed payloads.</t>
+    </section>
+    <section anchor="tenant-isolation" numbered="true"><name>Tenant-Isolated Rotation</name>
+      <t>In multi-tenant PKI deployments (draft-vicente-pquip-multitenant-pki-requirements), rotation orchestration MUST be scoped per tenant. Tenant A's epoch transition MUST NOT affect Tenant B's epoch state. The orchestrator MUST maintain separate state machine instances per tenant identifier. Cross-tenant epoch correlation signals MUST NOT be emitted.</t>
+    </section>
+    <section anchor="security-considerations" numbered="true"><name>Security Considerations</name>
+      <t>The orchestration framework eliminates epoch skew, the primary cause of PQC migration-induced verification failures. The ROLLBACK state ensures that a failed rotation does not leave any protocol stack in an inconsistent epoch state. Rotation Envelopes published to SCITT provide an auditable record of all epoch transitions. Operators MUST monitor epoch_id consistency across all registered protocol stacks using the observability mechanisms defined in draft-vicente-pquip-pqc-readiness-gaps.</t>
+    </section>
+    <section anchor="iana-considerations" numbered="true"><name>IANA Considerations</name>
+      <t>IANA is requested to register a media type for the inter-protocol epoch readiness signal format defined in this document.</t>
+    </section>
+  </middle>
+  <back>
+    <references>
+      <name>References</name>
+      <references>
+        <name>Normative References</name>
+        <reference anchor="RFC2119" target="https://www.rfc-editor.org/info/rfc2119"><front><title>Key words for use in RFCs to Indicate Requirement Levels</title><author initials="S." surname="Bradner"/><date year="1997" month="March"/></front></reference>
+        <reference anchor="RFC8174" target="https://www.rfc-editor.org/info/rfc8174"><front><title>Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words</title><author initials="B." surname="Leiba"/><date year="2017" month="May"/></front></reference>
+        <reference anchor="FIPS204" target="https://doi.org/10.6028/NIST.FIPS.204"><front><title>Module-Lattice-Based Digital Signature Standard (ML-DSA)</title><author><organization>NIST</organization></author><date year="2024" month="August"/></front></reference>
+      </references>
+    </references>
+  </back>
+</rfc>
